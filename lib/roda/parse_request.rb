@@ -9,20 +9,23 @@ class Roda
 
     OPTS = {}.freeze
 
+    DEFAULT_PARSERS = {
+      'application/x-www-form-urlencoded' => ->(data) { URI.decode_www_form(data) },
+      'application/json' => ->(data) { JSON.parse(data) }
+    }.freeze
+
+    IDENTITY_PARSER = (->(data) { data }).freeze
+
     # Set the classes to automatically convert to JSON
     def self.configure(app, opts=OPTS)
-      transforms = opts[:parser_transforms] || {
-          'application/x-www-form-urlencoded' => ->(data) { URI.decode_www_form(data) },
-          'application/json' => ->(data) { JSON.parse(data) }
-      }
-      app.opts[:parser_transforms] ||= {}
-      app.opts[:parser_transforms].merge!(transforms)
-      app.opts[:parser_transforms].freeze
+      parsers = DEFAULT_PARSERS.merge(opts[:parsers] || {})
+      app.opts[:parse_request_parsers] ||= parsers
+      app.opts[:parse_request_parsers].freeze
     end
 
     module ClassMethods
-      def parser_transforms
-        opts[:parser_transforms]
+      def parse_request_parsers
+        opts[:parse_request_parsers]
       end
     end
 
@@ -31,15 +34,14 @@ class Roda
         @parsed_body ||= parse_body(body)
       end
 
+      private
+
       def parse_body(input)
         data = input.read; input.rewind
 
-        return {} if data.nil? || data.empty?
+        parser = roda_class.parse_request_parsers[media_type] || IDENTITY_PARSER
 
-        transforms = roda_class.parser_transforms
-        _, transform = transforms.find { |matcher, _transform| matcher === media_type } || Proc.new{ data }
-
-        transform.call(data)
+        parser.call(data)
       end
     end
   end
