@@ -13,6 +13,11 @@ RSpec.describe Roda::ParseRequest do
       end
     end.app.freeze
   end
+    it 'works when no parser is found' do
+      post '/', 'hello', 'CONTENT_TYPE' => 'something/not-expected'
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to eq('"hello"')
+    end
 
   it 'parses json' do
     post '/', '{"valid":true}', 'CONTENT_TYPE' => 'application/json'
